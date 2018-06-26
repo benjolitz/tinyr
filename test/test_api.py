@@ -1,7 +1,8 @@
 
 
 
-import StringIO
+
+from io import StringIO
 
 from testutils import make_tree, make_subrect, randrange_float, tinyr
 
@@ -137,5 +138,5 @@ def test_infoobj():
         
         assert len(list(io.iter_rectangles())) > 0
         
-        io.to_dot(StringIO.StringIO())
+        io.to_dot(StringIO())
         

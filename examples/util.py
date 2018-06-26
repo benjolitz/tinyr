@@ -18,7 +18,7 @@
 
 try:
     import tinyr
-except ImportError, e:
+except ImportError as e:
     try:
         import pyximport
     except ImportError:
@@ -164,7 +164,7 @@ def node_gen(count, size=100, shift=1000, interleaved=True, preordered_coordinat
         idxs_off = 1
         y_start = 2
         
-    for ident in xrange(count):
+    for ident in range(count):
         coords = rand_rect(size, shift, interleaved)
         
         if preordered_coordinates:

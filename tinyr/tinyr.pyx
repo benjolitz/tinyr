@@ -64,12 +64,14 @@ class RTreeInvalid(Exception):
 
 ###############################################################################
 
+
 cdef inline void init_Dfloat4(Dfloat *f):
     # array initialization - compiler cries if we don't do that
     f[0] = 0
     f[1] = 0
     f[2] = 0
     f[3] = 0
+
 
 cdef inline void make_order(Dfloat *coords):
     cdef Dfloat switch
@@ -131,7 +133,10 @@ cdef class _Record:
         Dfloat coords[4]
 
     cdef inline bint overlaps(self, Dfloat *rect):
-        return self.coords[0] < rect[2] and self.coords[2] > rect[0] and self.coords[1] < rect[3] and self.coords[3] > rect[1]
+        return self.coords[0] <= rect[2] \
+            and self.coords[2] >= rect[0] \
+            and self.coords[1] <= rect[3] \
+            and self.coords[3] >= rect[1]
     
     cdef inline void copy_coords_to(self, Dfloat *coords):
         for i in range(4):
@@ -285,7 +290,8 @@ cdef list find_overlapping_leafs_recursive(RTree rtree, Dfloat *coords):
 
 cdef int PickSeedsQuadratic(_Node node, list remaining, _Node newnode) except -1:
     cdef:
-        Dfloat d, d_max, E1_E2[4]
+        Dfloat d, d_max,
+        Dfloat E1_E2[4]
         Dfloat J, a_E1, a_E2
         _Record E1_ret, E2_ret
         list combi
@@ -562,15 +568,15 @@ cdef class RTree(object):
             list leafs
             _Node node
             _ChildRecord rec
-        
+
         leafs = self.find_overlapping_leafs(self, coords)
         for node in leafs:
             assert node.is_leaf
             for rec in node.records:
                 if rec.identifier == identifier and rec.overlaps(coords):
-                    node.records.remove(rec) # D2
-                    return node 
-        
+                    node.records.remove(rec)  # D2
+                    return node
+
         return None
 
     cdef inline int CondenseTree(self, _Node node) except -1:
@@ -580,12 +586,13 @@ cdef class RTree(object):
             _Record rec
             _InnerRecord ir
             _ChildRecord crec
-            list removed_childrecords, removed_innerrecords, reclist
+            list removed_childrecords = None
+            list removed_innerrecords, reclist
         
         removed_innerrecords = list()
         
         N = node
-        while not N is self.root:
+        while N is not self.root:
             
             P = N.parent
             EN = parent_record(N)
@@ -852,7 +859,7 @@ cdef class RTree(object):
                     common_boundaries((<_InnerRecord>rec).child.records, tmp_coords)
                     
                     if area((<_Record>rec).coords) != area(tmp_coords):
-                        raise RTreeInvalid('wrong combined area of records of a node')
+                        raise RTreeInvalid('wrong combined area of records of a node, should be %f but got %f' % (area(tmp_coords), area((<_Record>rec).coords)))
 
                 # double-links cover each other
                 for ir in node.records:
@@ -933,7 +940,7 @@ cdef  class _RectangleIter(_Iterator):
             rec = self.leafrecords.pop()
             return (self.l_level, self.rtree.array_to_tuple((<_ChildRecord>rec).coords) )
         
-        level, nextnode = self.ni.next()
+        level, nextnode = next(self.ni)
         
         if nextnode.is_leaf:
            self.leafrecords = list(nextnode.records)
@@ -991,16 +998,20 @@ cdef class _KVIIter(_Iterator):
 
 cdef class _KeysIter(_KVIIter):
     def __next__(self):
-        return self.rtree.array_to_tuple((<_ChildRecord>self.cri.next()).coords)
+        cdef _ChildRecord cr
+        cr = next(self.cri)
+        return self.rtree.array_to_tuple(cr.coords)
 
 cdef class _ValuesIter(_KVIIter):
     def __next__(self):
-        return (<_ChildRecord>self.cri.next()).identifier
+        cdef _ChildRecord cr
+        cr = next(self.cri)
+        return cr.identifier
 
 cdef class _ItemsIter(_KVIIter):
     def __next__(self):
         cdef _ChildRecord cr
-        cr = self.cri.next()
+        cr = next(self.cri)
         return ( self.rtree.array_to_tuple(cr.coords), cr.identifier )
 
 
@@ -1062,7 +1073,7 @@ cdef class RTreeInfo:
             _InnerRecord ir
             _ChildRecord cr
             int level
-            unsigned nid, rid, chid, lid
+            size_t nid, rid, chid, lid
             list node_record_leaf, node_record_child
         
         filelike.write('digraph RTree {\n    node [shape=\"none\"]; \n')
